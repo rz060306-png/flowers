@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responsive Interactive Botanical Masterpiece</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(circle at center, #F4F8F6 0%, #DCE5E0 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        /* Tombol Play Premium */
+        #playButton {
+            padding: 10px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #5C755E;
+            background-color: #FFFFFF;
+            border: none;
+            border-radius: 50px;
+            box-shadow: 0 8px 20px rgba(80, 105, 90, 0.12);
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            letter-spacing: 0.5px;
+            z-index: 10;
+        }
+        #playButton:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(80, 105, 90, 0.2);
+            background-color: #F4F8F6;
+        }
+
+        /* Container Canvas agar fleksibel di mobile */
+        .canvas-container {
+            width: 90vw;
+            height: 80vh;
+            max-width: 850px;
+            max-height: 800px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            background-color: #FFFFFF;
+            box-shadow: 0 30px 70px rgba(80, 105, 90, 0.2);
+            border-radius: 32px;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="playButton">🎵 Putar Musik</button>
+    
+    <div class="canvas-container">
+        <canvas id="finalCanvas"></canvas>
+    </div>
+
+    <audio id="bgMusic" src="sound/sound.mpeg" preload="auto" loop></audio>
+
+    <script>
+        const canvas = document.getElementById('finalCanvas');
+        const ctx = canvas.getContext('2d');
+        const audio = document.getElementById('bgMusic');
+        const playBtn = document.getElementById('playButton');
+
+        let progress = 0;
+        let time = 0;
+        let isAudioPlaying = false;
+        let startGrowing = false; 
+        
+        let mouse = { x: 0, y: 0, targetX: 0, targetY: 0 };
+        let baseScale = 1; // Mengatur skala ukuran elemen berdasarkan resolusi layar
+
+        // Objek Pot Dinamis (Koordinat akan dihitung ulang saat resize)
+        let potConfig = { x: 0, y: 0, width: 0, height: 0 };
+
+        // 1. SETUP RESPONSIVE CANVAS RESOUTION
+        function resizeCanvas() {
+            const container = canvas.parentElement;
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+
+            // Tentukan basis skala (jika layar kecil/HP, ukuran gambar mengecil proporsional)
+            baseScale = Math.min(canvas.width / 850, canvas.height / 800);
+            if (baseScale < 0.65) baseScale = 0.65; // Batas minimum skala di HP kecil
+
+            // Atur ulang posisi pot sesuai dimensi layar baru
+            potConfig.x = canvas.width / 2;
+            potConfig.y = canvas.height - (180 * baseScale);
+            potConfig.width = 180 * baseScale;
+            potConfig.height = 130 * baseScale;
+
+            mouse.x = canvas.width / 2;
+            mouse.y = canvas.height / 2;
+        }
+
+        // 2. GENERATE BACKGROUND GLOW PARTICLES
+        const particles = [];
+        for(let i = 0; i < 30; i++) {
+            particles.push({
+                x: Math.random(), // simpan dalam rasio 0-1 agar aman saat resize
+                y: Math.random(),
+                radius: Math.random() * 2 + 1,
+                alpha: Math.random() * 0.6 + 0.3,
+                speedX: (Math.random() - 0.5) * 0.0005,
+                speedY: -(Math.random() * 0.0006 + 0.0002),
+                seed: Math.random() * 500
+            });
+        }
+
+        // 3. MATRIKS STRUKTUR VEKTOR TANAMAN (Menggunakan pengali baseScale untuk tinggi & ukuran bunga)
+        const plantMatrix = [
+            { id: 1, maxH: 420, angle: -4,  ctrlX: -40, delay: 0,    thick: 10, fColor: '#F5B7B7', pSize: 25 }, 
+            { id: 2, maxH: 340, angle: -26, ctrlX: -80, delay: 0.08, thick: 8,  fColor: '#E89E8C', pSize: 21 }, 
+            { id: 3, maxH: 320, angle: 20,  ctrlX: 70,  delay: 0.14, thick: 8,  fColor: '#EECEA9', pSize: 19 }, 
+            { id: 4, maxH: 220, angle: -48, ctrlX: -50, delay: 0.25, thick: 6,  fColor: '#E29FB7', pSize: 15 }, 
+            { id: 5, maxH: 200, angle: 42,  ctrlX: 60,  delay: 0.30, thick: 6,  fColor: '#F2D991', pSize: 14 }  
+        ];
+
+        // Jalankan resize pertama kali
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Kontrol Tombol Musik
+        playBtn.addEventListener('click', () => {
+            if(!isAudioPlaying) {
+                audio.play();
+                playBtn.innerText = "⏸ Pause Musik";
+                isAudioPlaying = true;
+            } else {
+                audio.pause();
+                playBtn.innerText = "🎵 Putar Musik";
+                isAudioPlaying = false;
+            }
+        });
+
+        // Event listener mouse & touch screen (HP)
+        function updateMousePos(clientX, clientY) {
+            const rect = canvas.getBoundingClientRect();
+            mouse.targetX = clientX - rect.left;
+            mouse.targetY = clientY - rect.top;
+        }
+
+        canvas.addEventListener('mousemove', (e) => {
+            updateMousePos(e.clientX, e.clientY);
+            if (checkIfOverPot(mouse.targetX, mouse.targetY)) {
+                canvas.style.cursor = 'pointer';
+            } else {
+                canvas.style.cursor = 'default';
+            }
+        });
+
+        // Dukungan Sentuhan Layar HP
+        canvas.addEventListener('touchmove', (e) => {
+            if(e.touches.length > 0) {
+                updateMousePos(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        });
+
+        canvas.addEventListener('click', () => {
+            if (checkIfOverPot(mouse.targetX, mouse.targetY)) {
+                startGrowing = true; 
+            }
+        });
+
+        canvas.addEventListener('touchstart', (e) => {
+            if(e.touches.length > 0) {
+                updateMousePos(e.touches[0].clientX, e.touches[0].clientY);
+                if (checkIfOverPot(mouse.targetX, mouse.targetY)) {
+                    startGrowing = true;
+                }
+            }
+        });
+
+        function checkIfOverPot(px, py) {
+            return (px >= potConfig.x - potConfig.width/2 && 
+                    px <= potConfig.x + potConfig.width/2 && 
+                    py >= potConfig.y - 15 && 
+                    py <= potConfig.y + potConfig.height);
+        }
+
+        function getQuadraticBezierXY(t, startX, startY, controlX, controlY, endX, endY) {
+            const x = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * controlX + t * t * endX;
+            const y = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * controlY + t * t * endY;
+            return { x, y };
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            time += 0.015;
+
+            mouse.x += (mouse.targetX - mouse.x) * 0.05;
+            mouse.y += (mouse.targetY - mouse.y) * 0.05;
+
+            drawAmbientParticles();
+
+            if (startGrowing && progress < 1) {
+                progress += 0.0025; 
+            }
+
+            plantMatrix.forEach(stem => {
+                let localProg = (progress - stem.delay) / (1 - stem.delay);
+                if (localProg < 0) localProg = 0;
+                
+                let ease = 1 - Math.pow(1 - localProg, 4);
+
+                if (ease > 0) {
+                    ctx.save();
+                    ctx.translate(potConfig.x, potConfig.y);
+
+                    let mouseInfluence = ((mouse.x - canvas.width/2) / canvas.width) * 0.06 * ease;
+                    let wind = Math.sin(time + stem.id * 3) * 0.022 * ease + mouseInfluence;
+                    ctx.rotate((stem.angle * Math.PI / 180) + wind);
+
+                    // Skala Tinggi Berdasarkan Layar (baseScale)
+                    let currentH = stem.maxH * baseScale * ease;
+                    let endX = Math.sin(wind) * (currentH * 0.05);
+                    let endY = -currentH;
+                    let ctrlX = stem.ctrlX * baseScale * ease;
+                    let ctrlY = -currentH * 0.5;
+
+                    // Batang
+                    ctx.beginPath();
+                    ctx.moveTo(0, 0);
+                    ctx.quadraticCurveTo(ctrlX, ctrlY, endX, endY);
+                    
+                    let stemGrad = ctx.createLinearGradient(0, 0, endX, endY);
+                    stemGrad.addColorStop(0, '#5C755E');
+                    stemGrad.addColorStop(0.6, '#769278');
+                    stemGrad.addColorStop(1, '#96B098');
+
+                    ctx.strokeStyle = stemGrad;
+                    ctx.lineWidth = stem.thick * baseScale * (1 - ease * 0.45);
+                    ctx.lineCap = 'round';
+                    ctx.stroke();
+
+                    // Daun Bezier Skala HP
+                    if (localProg > 0.2) {
+                        let leafEase = 1 - Math.pow(1 - ((localProg - 0.2) / 0.8), 3);
+                        let pos = getQuadraticBezierXY(0.3, 0, 0, ctrlX, ctrlY, endX, endY);
+                        drawPerfectLeaf(pos.x, pos.y, -65, 48 * baseScale * leafEase, '#7D9A80', '#9EBBA1');
+                        drawPerfectLeaf(pos.x, pos.y, 45, 43 * baseScale * leafEase, '#7D9A80', '#9EBBA1');
+                    }
+
+                    if (localProg > 0.45) {
+                        let leafEase = 1 - Math.pow(1 - ((localProg - 0.45) / 0.55), 3);
+                        let pos = getQuadraticBezierXY(0.6, 0, 0, ctrlX, ctrlY, endX, endY);
+                        drawPerfectLeaf(pos.x, pos.y, -45, 40 * baseScale * leafEase, '#738F76', '#92AD95');
+                        drawPerfectLeaf(pos.x, pos.y, 60, 35 * baseScale * leafEase, '#738F76', '#92AD95');
+                    }
+
+                    if (localProg > 0.65) {
+                        let leafEase = 1 - Math.pow(1 - ((localProg - 0.65) / 0.35), 3);
+                        let pos = getQuadraticBezierXY(0.82, 0, 0, ctrlX, ctrlY, endX, endY);
+                        drawPerfectLeaf(pos.x, pos.y, -30, 30 * baseScale * leafEase, '#8FA992', '#B0CBB3');
+                        drawPerfectLeaf(pos.x, pos.y, 40, 25 * baseScale * leafEase, '#8FA992', '#B0CBB3');
+                    }
+
+                    // Bunga Mekar Skala HP
+                    if (localProg > 0.72) {
+                        let fProg = (localProg - 0.72) / 0.28;
+                        let springEase = 1 - Math.exp(-6 * fProg) * Math.cos(2 * Math.PI * fProg);
+                        drawUltraFlower(endX, endY, stem.pSize * baseScale * springEase, stem.fColor);
+                    }
+
+                    ctx.restore();
+                }
+            });
+
+            drawLuxuryPot();
+
+            requestAnimationFrame(render);
+        }
+
+        function drawPerfectLeaf(x, y, angle, size, baseColor, lightColor) {
+            if (size <= 0) return;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle * Math.PI / 180);
+            
+            let leftGrad = ctx.createLinearGradient(0, 0, -size*0.4, -size*0.5);
+            leftGrad.addColorStop(0, baseColor);
+            leftGrad.addColorStop(1, lightColor);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(-size * 0.45, -size * 0.2, -size * 0.4, -size * 0.8, 0, -size);
+            ctx.lineTo(0, 0);
+            ctx.fillStyle = leftGrad;
+            ctx.fill();
+
+            let rightGrad = ctx.createLinearGradient(0, 0, size*0.4, -size*0.5);
+            rightGrad.addColorStop(0, baseColor);
+            rightGrad.addColorStop(1, darkenColor(baseColor, 15));
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.bezierCurveTo(size * 0.45, -size * 0.2, size * 0.4, -size * 0.8, 0, -size);
+            ctx.lineTo(0, 0);
+            ctx.fillStyle = rightGrad;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -size * 0.95);
+            ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+            ctx.lineWidth = size * 0.04;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawUltraFlower(x, y, radius, color) {
+            if (radius <= 0) return;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(time * 0.2); 
+
+            ctx.fillStyle = color;
+            for (let i = 0; i < 6; i++) {
+                ctx.beginPath();
+                ctx.arc(0, -radius * 0.9, radius * 0.68, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.rotate((60 * Math.PI) / 180);
+            }
+
+            ctx.fillStyle = '#FFF5F5';
+            for (let i = 0; i < 6; i++) {
+                ctx.beginPath();
+                ctx.arc(0, -radius * 0.5, radius * 0.42, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.rotate((60 * Math.PI) / 180);
+            }
+
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.48, 0, Math.PI * 2);
+            ctx.fillStyle = '#FAD390';
+            ctx.fill();
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, radius * 0.25, 0, Math.PI * 2);
+            ctx.fillStyle = '#F6B93B';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawLuxuryPot() {
+            const x = potConfig.x;
+            const y = potConfig.y;
+            const w = potConfig.width;
+            const h = potConfig.height;
+
+            ctx.save();
+            // Bayangan Pot
+            ctx.beginPath();
+            ctx.ellipse(x, y + h, w * 0.55, 20 * baseScale, 0, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(60, 80, 65, 0.08)`;
+            ctx.fill();
+
+            // Pot Body
+            let potGrad = ctx.createLinearGradient(x - w/2, y, x + w/2, y + h);
+            potGrad.addColorStop(0, '#EFEAE4');
+            potGrad.addColorStop(0.4, '#E5DDC9');
+            potGrad.addColorStop(1, '#C2B49A');
+
+            ctx.beginPath();
+            ctx.moveTo(x - w*0.48, y);
+            ctx.lineTo(x + w*0.48, y);
+            ctx.quadraticCurveTo(x + w*0.42, y + h*0.8, x + w*0.32, y + h);
+            ctx.lineTo(x - w*0.32, y + h);
+            ctx.quadraticCurveTo(x - w*0.42, y + h*0.8, x - w*0.48, y);
+            ctx.closePath();
+            ctx.fillStyle = potGrad;
+            ctx.fill();
+
+            // Bibir Pot Atas
+            ctx.beginPath();
+            ctx.roundRect(x - w*0.51, y - (10*baseScale), w * 1.02, 20 * baseScale, 8 * baseScale);
+            ctx.fillStyle = '#D6CBB7';
+            ctx.fill();
+
+            // Dekorasi Minimalis Pot
+            ctx.beginPath();
+            ctx.arc(x, y + h*0.45, 25 * baseScale, 0, Math.PI, false);
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+            ctx.lineWidth = 4 * baseScale;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore()
+        }
+
+        function drawAmbientParticles() {
+            particles.forEach(p => {
+                // Update posisi rasio
+                p.y += p.speedY;
+                let mouseShift = ((mouse.x - canvas.width / 2) / canvas.width) * 0.0005;
+                p.x += p.speedX + Math.sin(time + p.seed) * 0.0002 + mouseShift;
+
+                if (p.y < -0.02) p.y = 0.8;
+                if (p.x < 0) p.x = 1;
+                if (p.x > 1) p.x = 0;
+
+                // Konversi rasio ke koordinat piksel aktual canvas saat menggambar
+                let realX = p.x * canvas.width;
+                let realY = p.y * canvas.height;
+
+                ctx.save();
+                ctx.globalAlpha = p.alpha * (0.4 + Math.sin(time * 2.5 + p.seed) * 0.5);
+                ctx.beginPath();
+                ctx.arc(realX, realY, p.radius * baseScale, 0, Math.PI * 2);
+                ctx.fillStyle = '#FFF9E6';
+                ctx.shadowBlur = 10 * baseScale;
+                ctx.shadowColor = '#FFEAA7';
+                ctx.fill();
+                ctx.restore();
+            });
+        }
+
+        function darkenColor(hex, percent) {
+            let num = parseInt(hex.replace("#",""), 16),
+            amt = Math.round(2.55 * percent),
+            R = (num >> 16) - amt,
+            G = (num >> 8 & 0x00FF) - amt,
+            B = (num & 0x0000FF) - amt;
+            return "#" + (0x1000000 + (R<0?0:R>255?255:R)*0x10000 + (G<0?0:G>255?255:G)*0x100 + (B<0?0:B>255?255:B)).toString(16).slice(1);
+        }
+
+        render();
+    </script>
+</body>
+</html>
