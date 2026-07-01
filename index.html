@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Responsive Interactive Botanical Masterpiece - HP Scale</title>
+    <title>Responsive Interactive Botanical Masterpiece - Lower Pot</title>
     <style>
         body {
             margin: 0;
@@ -28,7 +28,7 @@
             border-radius: 50px;
             box-shadow: 0 8px 20px rgba(80, 105, 90, 0.12);
             cursor: pointer;
-            margin-bottom: 10px;
+            margin-bottom: 8px;
             transition: all 0.3s ease;
             letter-spacing: 0.5px;
             z-index: 10;
@@ -45,10 +45,10 @@
             color: #6B8070;
             letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             min-height: 20px;
             text-align: center;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
             opacity: 0.8;
             text-shadow: 0 2px 4px rgba(92, 117, 94, 0.1);
             padding: 0 10px;
@@ -60,18 +60,32 @@
             color: #4A5F4F !important;
         }
 
+        .final-gift-text {
+            font-family: 'Georgia', serif;
+            font-size: 18px !important;
+            font-style: italic;
+            text-transform: none !important;
+            letter-spacing: 2px !important;
+            color: #8FA992 !important;
+            animation: fadeInGlance 1.5s forwards ease-out;
+        }
+
+        @keyframes fadeInGlance {
+            0% { opacity: 0; transform: translateY(5px); }
+            100% { opacity: 0.9; transform: translateY(0); text-shadow: 0 2px 10px rgba(150, 176, 152, 0.2); }
+        }
+
         @keyframes breatheEffect {
             0% { opacity: 0.4; transform: scale(0.98); }
             50% { opacity: 0.9; transform: scale(1); text-shadow: 0 0 10px rgba(118, 146, 120, 0.3); }
             100% { opacity: 0.4; transform: scale(0.98); }
         }
 
-        /* Dioptimalkan agar pas di frame HP */
         .canvas-container {
             width: 85vw;
-            height: 70vh;
-            max-width: 500px; /* Batas lebar maksimal disesuaikan untuk HP */
-            max-height: 700px;
+            height: 55vh; 
+            max-width: 480px; 
+            max-height: 520px;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -110,6 +124,7 @@
         let isAudioPlaying = false;
         let startGrowing = false; 
         let countdownFinished = false;
+        let finalDynamicTextTriggered = false; 
         let countdownValue = 5; 
         let countdownTimer = null; 
         
@@ -117,21 +132,21 @@
         let baseScale = 1; 
         let potConfig = { x: 0, y: 0, width: 0, height: 0 };
 
-        // PERBAIKAN UTAMA: Skala disesuaikan khusus portrait HP
         function resizeCanvas() {
             const container = canvas.parentElement;
             canvas.width = container.clientWidth;
             canvas.height = container.clientHeight;
 
-            // Pengali baseScale diturunkan agar objek mengecil dengan sempurna di layar HP
-            baseScale = Math.min(canvas.width / 550, canvas.height / 650);
-            if (baseScale < 0.45) baseScale = 0.45; // Batas minimal skala diperkecil untuk HP ramping
-            if (baseScale > 1) baseScale = 1;
+            baseScale = Math.min(canvas.width / 480, canvas.height / 520);
+            if (baseScale < 0.5) baseScale = 0.5; 
+            if (baseScale > 0.9) baseScale = 0.9; 
 
             potConfig.x = canvas.width / 2;
-            potConfig.y = canvas.height - (140 * baseScale); // Posisi pot dinaikkan sedikit agar proporsional
-            potConfig.width = 160 * baseScale;
-            potConfig.height = 115 * baseScale;
+            
+            // PERBAIKAN POSISI: Pot diturunkan maksimal, menyisakan ruang kecil di bawah untuk bayangan dasar
+            potConfig.height = 110 * baseScale;
+            potConfig.y = canvas.height - potConfig.height - 20; 
+            potConfig.width = 150 * baseScale;
 
             mouse.x = canvas.width / 2;
             mouse.y = canvas.height / 2;
@@ -150,13 +165,13 @@
             });
         }
 
-        // Ukuran MaxH batang otomatis akan terkalibrasi oleh baseScale baru yang lebih bersahabat untuk HP
+        // Tinggi maksimal tanaman disesuaikan proporsional agar tidak melebihi bagian atas kanvas
         const plantMatrix = [
-            { id: 1, maxH: 380, angle: -4,  ctrlX: -40, delay: 0,    thick: 9,  fColor: '#F5B7B7', pSize: 23 }, 
-            { id: 2, maxH: 310, angle: -26, ctrlX: -70, delay: 0.08, thick: 7.5,fColor: '#E89E8C', pSize: 19 }, 
-            { id: 3, maxH: 290, angle: 20,  ctrlX: 60,  delay: 0.14, thick: 7.5,fColor: '#EECEA9', pSize: 18 }, 
-            { id: 4, maxH: 200, angle: -48, ctrlX: -45, delay: 0.25, thick: 5.5,fColor: '#E29FB7', pSize: 14 }, 
-            { id: 5, maxH: 180, angle: 42,  ctrlX: 50,  delay: 0.30, thick: 5.5,fColor: '#F2D991', pSize: 13 }  
+            { id: 1, maxH: 350, angle: -4,  ctrlX: -35, delay: 0,    thick: 8.5, fColor: '#F5B7B7', pSize: 21 }, 
+            { id: 2, maxH: 290, angle: -24, ctrlX: -60, delay: 0.08, thick: 7,   fColor: '#E89E8C', pSize: 18 }, 
+            { id: 3, maxH: 270, angle: 18,  ctrlX: 50,  delay: 0.14, thick: 7,   fColor: '#EECEA9', pSize: 17 }, 
+            { id: 4, maxH: 190, angle: -44, ctrlX: -40, delay: 0.25, thick: 5,   fColor: '#E29FB7', pSize: 13 }, 
+            { id: 5, maxH: 170, angle: 38,  ctrlX: 45,  delay: 0.30, thick: 5,   fColor: '#F2D991', pSize: 12 }  
         ];
 
         window.addEventListener('resize', resizeCanvas);
@@ -187,7 +202,7 @@
         playBtn.addEventListener('click', () => {
             if(!isAudioPlaying) {
                 audio.play().catch(err => console.log("Audio diputar."));
-                playBtn.innerText = "⏸ Pause Musik";
+                playBtn.innerText = "Pause Musik";
                 isAudioPlaying = true;
                 
                 if(!startGrowing && !countdownFinished) {
@@ -243,7 +258,9 @@
             startGrowing = true; 
             infoText.style.opacity = '0'; 
             canvas.style.cursor = 'default';
-            setTimeout(() => { infoText.innerHTML = ""; }, 500); 
+            setTimeout(() => { 
+                if(!finalDynamicTextTriggered) infoText.innerHTML = ""; 
+            }, 500); 
         }
 
         function checkIfOverPot(px, py) {
@@ -270,6 +287,13 @@
 
             if (startGrowing && progress < 1) {
                 progress += 0.0025; 
+                
+                if (progress >= 1 && !finalDynamicTextTriggered) {
+                    finalDynamicTextTriggered = true;
+                    infoText.innerHTML = "These are for you";
+                    infoText.className = "final-gift-text";
+                    infoText.style.opacity = "0.9";
+                }
             }
 
             plantMatrix.forEach(stem => {
